@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 26 26 26;
+    --foreground: 243 244 246;
+    --accent: 217 249 157;
+  }
+  
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-[#1A1A1A] text-[#F3F4F6] antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    word-break: keep-all; /* 한글 단어 중간에 끊기지 않게 */
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-sans tracking-tight;
+  }
+
+  .font-serif-KR {
+    font-family: 'Noto Serif KR', serif;
+  }
+}
+
+/* 스크롤바 */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #1A1A1A; }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #D9F99D; }
