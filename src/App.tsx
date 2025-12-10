@@ -3,17 +3,20 @@ import Navigation from './components/Navigation';
 import Hero from './components/Hero';
 import About from './components/About';
 import BentoGrid from './components/BentoGrid';
+// ★ 새로 만든 컴포넌트 연결
+import Certifications from './components/Certifications';
+import Interests from './components/Interests';
 import Activities from './components/Activities';
 import Guestbook from './components/Guestbook';
 import Footer from './components/Footer';
-import BackgroundMusic from './components/BackgroundMusic'; // 음악 불러오기
+import BackgroundMusic from './components/BackgroundMusic';
 import { AdminProvider, useAdmin } from './contexts/AdminContext';
 
 const Content: React.FC = () => {
   const { sectionTitles } = useAdmin();
 
   useEffect(() => {
-    // 탭 제목 설정
+    // 브라우저 탭 제목 변경
     document.title = sectionTitles?.navTitle || "The Life Investor";
   }, [sectionTitles]);
 
@@ -26,12 +29,17 @@ const Content: React.FC = () => {
       {/* 2. 메인 콘텐츠 섹션들 */}
       <About />
       <BentoGrid />
+      
+      {/* ★ 새로 추가된 섹션들 (포트폴리오 아래) */}
+      <Certifications />
+      <Interests />
+      
       <Activities />
       <Guestbook />
 
       {/* 3. 하단 푸터 & 배경음악 */}
       <Footer />
-      <BackgroundMusic /> {/* ★ 여기 있어야 음악 버튼이 보입니다! */}
+      <BackgroundMusic />
     </main>
   );
 };

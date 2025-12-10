@@ -1,6 +1,6 @@
 import React, { useRef, useState, MouseEvent } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, ChevronLeft, ChevronRight, Plus, Edit2, Trash2, Save, X } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Plus, Edit2, Trash2, Save, X, CalendarClock } from 'lucide-react';
 import { useAdmin } from '../contexts/AdminContext';
 import type { ActivityItem } from '../types';
 import ActivityFormModal from './ActivityFormModal';
@@ -29,7 +29,7 @@ const Activities: React.FC = () => {
   const handleMouseMove = (e: MouseEvent) => { if (!isDragging || !scrollRef.current) return; e.preventDefault(); const x = e.pageX - scrollRef.current.offsetLeft; const walk = (x - startX) * 2; scrollRef.current.scrollLeft = scrollLeft - walk; };
 
   return (
-    <section className="py-24 md:py-32 px-6 w-full bg-[#1A1A1A] relative" id="activities">
+    <section className="py-16 md:py-32 px-6 w-full bg-[#1A1A1A] relative" id="activities">
       <div className="max-w-7xl mx-auto mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div className="flex flex-col gap-2 w-full md:w-auto">
           {isEditingTitle ? (
@@ -44,13 +44,14 @@ const Activities: React.FC = () => {
           ) : (
             <div className="group relative">
               <div className="flex items-center gap-3">
-                {/* ★ 점 삭제 완료 */}
-                <h2 className="text-3xl md:text-5xl font-bold text-white">
+                {/* ★ 디자인 통일 */}
+                <CalendarClock className="text-[#D9F99D] hidden md:block" size={36} />
+                <h2 className="text-3xl md:text-5xl font-bold text-white tracking-tight">
                   {sectionTitles.activitiesTitle}
                 </h2>
                 {isAdmin && <button onClick={() => setIsEditingTitle(true)} className="text-zinc-500 hover:text-white"><Edit2 size={18} /></button>}
               </div>
-              <p className="text-base md:text-lg text-gray-400 font-serif-KR mt-2">{sectionTitles.activitiesSubtitle}</p>
+              <p className="text-base md:text-lg text-gray-400 font-serif-KR mt-2 ml-1">{sectionTitles.activitiesSubtitle}</p>
             </div>
           )}
         </div>

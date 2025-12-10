@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Trash2, Edit2, Save, X } from 'lucide-react';
+// ★ 중요: 에러 나던 MessageSquareQuote 제거 -> MessageSquare 로 변경
+import { Send, Trash2, Edit2, Save, X, MessageSquare } from 'lucide-react';
 import { useAdmin } from '../contexts/AdminContext';
 
 const Guestbook: React.FC = () => {
@@ -18,7 +19,7 @@ const Guestbook: React.FC = () => {
   const handleDelete = (id: string) => { if (window.confirm('정말 삭제하시겠습니까?')) deleteGuestbookMessage(id); };
 
   return (
-    <section className="py-24 md:py-32 px-6 max-w-4xl mx-auto w-full relative z-10" id="guestbook">
+    <section className="py-16 md:py-32 px-6 max-w-4xl mx-auto w-full relative z-10" id="guestbook">
       <div className="flex items-center gap-4 mb-10">
         {isEditingTitle ? (
           <div className="flex items-center gap-2">
@@ -28,8 +29,9 @@ const Guestbook: React.FC = () => {
           </div>
         ) : (
           <div className="flex items-center gap-3 group">
-            {/* ★ 점 삭제 완료 & 색상 통일 */}
-            <h2 className="text-3xl md:text-5xl font-bold text-white">
+            {/* ★ 바뀐 아이콘 적용 */}
+            <MessageSquare className="text-[#D9F99D] hidden md:block" size={36} />
+            <h2 className="text-3xl md:text-5xl font-bold text-white tracking-tight">
               {sectionTitles.guestbookTitle}
             </h2>
             {isAdmin && <button onClick={() => setIsEditingTitle(true)} className="opacity-0 group-hover:opacity-100 transition-opacity p-2 text-zinc-500 hover:text-white"><Edit2 size={18} /></button>}
@@ -42,14 +44,14 @@ const Guestbook: React.FC = () => {
           <div className="flex flex-col md:flex-row gap-3">
             <input type="text" value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="이름 (닉네임)" className="w-full md:w-1/3 bg-zinc-800/80 border border-white/10 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-[#D9F99D] transition-colors" required />
             <div className="flex-1 flex gap-2">
-              <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="따뜻한 응원 메시지를 남겨주세요..." className="flex-1 bg-zinc-800/80 border border-white/10 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-[#D9F99D] transition-colors" required />
+              <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="여러분의 소식도 남겨 주세요.." className="flex-1 bg-zinc-800/80 border border-white/10 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-[#D9F99D] transition-colors" required />
               <button type="submit" className="bg-[#D9F99D] text-black px-6 rounded-lg font-bold hover:bg-[#bef264] transition-colors flex items-center justify-center"><Send size={20} /></button>
             </div>
           </div>
         </form>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-thin scrollbar-thumb-zinc-700" ref={scrollRef}>
-          {guestbookMessages.length === 0 && <div className="text-center text-gray-500 py-20"><p>아직 작성된 방명록이 없습니다.</p><p className="text-sm mt-2">첫 번째 메시지의 주인공이 되어주세요!</p></div>}
+          {guestbookMessages.length === 0 && <div className="text-center text-gray-500 py-20"><p>아직 작성된 방명록이 없습니다.</p><p className="text-sm mt-2">첫 번째 메시지를 남겨주세요!</p></div>}
           <AnimatePresence>
             {[...guestbookMessages].reverse().map((msg) => (
               <motion.div key={msg.id} initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }} className="bg-zinc-800/50 p-4 rounded-xl border border-white/5 relative group">

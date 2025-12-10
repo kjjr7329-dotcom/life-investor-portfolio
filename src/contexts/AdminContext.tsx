@@ -1,9 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import type { 
-  SectionTitles, HeroData, AboutData, ActivityItem, 
+import type {
+  SectionTitles, HeroData, AboutData, ActivityItem,
   BentoGridItem, GuestbookMessage, BackgroundMusicSettings
 } from '../types';
+
+// ★ 이미지 URL 필드 추가
+interface CertificationItem { id: string; title: string; description: string; icon: string; color: string; imageUrl?: string; }
+interface InterestItem { id: string; title: string; description: string; category: 'TECH' | 'HOBBY'; icon: string; color: string; imageUrl?: string; }
 
 interface AdminContextType {
   sectionTitles: SectionTitles;
@@ -13,6 +17,8 @@ interface AdminContextType {
   activities: ActivityItem[];
   guestbookMessages: GuestbookMessage[];
   bgMusic: BackgroundMusicSettings;
+  certifications: CertificationItem[];
+  interests: InterestItem[];
 
   updateSectionTitles: (data: SectionTitles) => void;
   updateHeroData: (data: HeroData) => void;
@@ -20,30 +26,34 @@ interface AdminContextType {
   updateBentoItems: (data: BentoGridItem[]) => void;
   updateActivities: (data: ActivityItem[]) => void;
   updateBgMusic: (data: BackgroundMusicSettings) => void;
+  updateCertifications: (items: CertificationItem[]) => void;
+  updateInterests: (items: InterestItem[]) => void;
   addGuestbookMessage: (msg: Omit<GuestbookMessage, 'id'>) => void;
   deleteGuestbookMessage: (id: string) => void;
-  
+
   isAdmin: boolean;
   login: (password: string) => boolean;
   logout: () => void;
 }
 
-const defaultSectionTitles = { 
-  navTitle: 'The Life Investor',
-  aboutTitle: '나의 이야기',
-  bentoTitle: '나의 작업물',
-  activitiesTitle: '활동 내역',
-  activitiesSubtitle: '가끔, 소소한 일상을 전합니다.',
-  guestbookTitle: '방명록'
-};
+const defaultSectionTitles = { navTitle: 'The Life Investor', aboutTitle: '나의 이야기', bentoTitle: '나의 작업물', activitiesTitle: '활동 내역', activitiesSubtitle: '가끔, 소소한 일상을 전합니다.', guestbookTitle: '방명록' };
 const defaultHeroData = { mainText: '시간에 투자하고,\n이야기를 만듭니다.', subText: '차트 너머의 세상.\n퇴직 후, 투자의 눈으로 일상을 다시 기록합니다.', bgImage: '' };
-const defaultAboutData = { 
-  title: '제이진을 소개합니다', 
-  description: '30년 간의 숨 가쁜 직장 생활을 마치고, 이제는 전업 투자자로서 제2의 인생을 항해합니다.\n\n매일 아침 냉철한 이성으로 차트를 분석하며 하루를 시작하지만, 오후에는 카메라를 들고 따뜻한 시선으로 세상의 틈을 기록합니다.', 
-  imageUrl: 'https://images.unsplash.com/photo-1555601568-c99da687ffe7?q=80&w=1000&auto=format&fit=crop', 
-  skills: ['전업 투자', '유튜브 크리에이터', '콘텐츠 자동화', '동기부여'] 
-};
+const defaultAboutData = { title: '제이진을 소개합니다', description: '전업 투자자로서 제2의 인생을 항해합니다.', imageUrl: '', skills: ['전업 투자', '유튜브 크리에이터', '콘텐츠 자동화', '동기부여'] };
 const defaultBgMusic = { url: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3', isPlaying: false };
+
+const defaultCertifications: CertificationItem[] = [
+  { id: '1', title: '공인중개사', description: '부동산 자산 권리 분석 및 투자 중개 실무', icon: 'home', color: 'bg-purple-500/20 text-purple-400' },
+  { id: '2', title: '정보처리산업기사', description: '데이터 시스템 구조 이해 및 프로세스 최적화', icon: 'database', color: 'bg-blue-500/20 text-blue-400' },
+  { id: '3', title: '행정사', description: '행정 기관 인허가 및 서류 작성 대행 전문 자격', icon: 'file', color: 'bg-red-500/20 text-red-400' },
+];
+const defaultInterests: InterestItem[] = [
+  { id: '1', title: 'AI 연구', description: '미래를 이끌어 갈 최신 AI 트렌드 및 LLM 활용', category: 'TECH', icon: 'chip', color: 'bg-indigo-500/20 text-indigo-400' },
+  { id: '2', title: '업무 자동화', description: '생산성 향상을 위한 프로세스 최적화', category: 'TECH', icon: 'robot', color: 'bg-cyan-500/20 text-cyan-400' },
+  { id: '3', title: '콘텐츠 제작', description: '디지털 미디어 & 스토리텔링', category: 'TECH', icon: 'video', color: 'bg-pink-500/20 text-pink-400' },
+  { id: '4', title: '테니스', description: '즐거운 테니스, 건강한 신체', category: 'HOBBY', icon: 'activity', color: 'bg-orange-500/20 text-orange-400' },
+  { id: '5', title: '바이크 여행', description: '자유로운 바람을 느끼며 새로운 풍경 여행', category: 'HOBBY', icon: 'bike', color: 'bg-yellow-500/20 text-yellow-400' },
+  { id: '6', title: '독서', description: '깊은 통찰을 얻는 지적 투자', category: 'HOBBY', icon: 'book', color: 'bg-green-500/20 text-green-400' },
+];
 
 const AdminContext = createContext<AdminContextType | undefined>(undefined);
 
@@ -56,119 +66,56 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [guestbookMessages, setGuestbookMessages] = useState<GuestbookMessage[]>([]);
   const [bgMusic, setBgMusic] = useState(defaultBgMusic);
+  const [certifications, setCertifications] = useState<CertificationItem[]>([]);
+  const [interests, setInterests] = useState<InterestItem[]>([]);
 
   const loadData = async () => {
     try {
       const { data: configData } = await supabase.from('site_config').select('*');
-      
       if (configData && configData.length > 0) {
         configData.forEach(item => {
           if (item.key === 'titles') setSectionTitles(item.data);
           if (item.key === 'hero') setHeroData(item.data);
           if (item.key === 'about') setAboutData(item.data);
           if (item.key === 'music') setBgMusic(item.data);
+          if (item.key === 'certifications') setCertifications(item.data);
+          if (item.key === 'interests') setInterests(item.data);
         });
       } else {
         await supabase.from('site_config').insert([
-          { key: 'titles', data: defaultSectionTitles },
-          { key: 'hero', data: defaultHeroData },
-          { key: 'about', data: defaultAboutData },
-          { key: 'music', data: defaultBgMusic }
+          { key: 'titles', data: defaultSectionTitles }, { key: 'hero', data: defaultHeroData },
+          { key: 'about', data: defaultAboutData }, { key: 'music', data: defaultBgMusic },
+          { key: 'certifications', data: defaultCertifications }, { key: 'interests', data: defaultInterests }
         ]);
+        setCertifications(defaultCertifications);
+        setInterests(defaultInterests);
       }
-
       const { data: bento } = await supabase.from('bento_items').select('*').order('created_at', { ascending: true });
       if (bento) setBentoItems(bento);
-
-      // ★ [핵심 수정 부분] 활동 내역 불러올 때 이름표 바꿔주기 (image_url -> imageUrl)
       const { data: acts } = await supabase.from('activities').select('*').order('date', { ascending: false });
-      if (acts) {
-        const mappedActivities = acts.map((item: any) => ({
-          ...item,
-          imageUrl: item.image_url // DB의 image_url을 앱이 쓰는 imageUrl로 연결!
-        }));
-        setActivities(mappedActivities);
-      }
-
+      if (acts) setActivities(acts.map((item: any) => ({ ...item, imageUrl: item.image_url })));
       const { data: msgs } = await supabase.from('guestbook').select('*').order('created_at', { ascending: true });
       if (msgs) setGuestbookMessages(msgs);
-
-    } catch (error) {
-      console.error("데이터 로딩 실패:", error);
-    }
+    } catch (error) { console.error(error); }
   };
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
-  const updateSectionTitles = async (data: SectionTitles) => {
-    setSectionTitles(data);
-    await supabase.from('site_config').upsert({ key: 'titles', data });
-  };
-  const updateHeroData = async (data: HeroData) => {
-    setHeroData(data);
-    await supabase.from('site_config').upsert({ key: 'hero', data });
-  };
-  const updateAboutData = async (data: AboutData) => {
-    setAboutData(data);
-    await supabase.from('site_config').upsert({ key: 'about', data });
-  };
-  const updateBgMusic = async (data: BackgroundMusicSettings) => {
-    setBgMusic(data);
-    await supabase.from('site_config').upsert({ key: 'music', data });
-  };
-
-  const updateBentoItems = async (items: BentoGridItem[]) => {
-    setBentoItems(items);
-    for (const item of items) {
-        await supabase.from('bento_items').upsert({
-            id: item.id,
-            title: item.title, description: item.description,
-            header: item.header, img: item.img, class_name: item.className
-        });
-    }
-  };
-
-  // ★ 저장할 때도 확실하게 image_url로 보내기
-  const updateActivities = async (items: ActivityItem[]) => {
-    setActivities(items);
-    for (const item of items) {
-        await supabase.from('activities').upsert({
-            id: item.id,
-            title: item.title, date: item.date,
-            description: item.description, 
-            image_url: item.imageUrl // 앱의 imageUrl을 DB의 image_url로 변환
-        });
-    }
-  };
-
-  const addGuestbookMessage = async (msg: Omit<GuestbookMessage, 'id'>) => {
-    const { data } = await supabase.from('guestbook').insert(msg).select();
-    if (data) {
-      setGuestbookMessages(prev => [...prev, ...data]);
-    }
-  };
-
-  const deleteGuestbookMessage = async (id: string) => {
-    await supabase.from('guestbook').delete().eq('id', id);
-    setGuestbookMessages(prev => prev.filter(msg => msg.id.toString() !== id.toString()));
-  };
-
+  const updateSectionTitles = async (data: SectionTitles) => { setSectionTitles(data); await supabase.from('site_config').upsert({ key: 'titles', data }); };
+  const updateHeroData = async (data: HeroData) => { setHeroData(data); await supabase.from('site_config').upsert({ key: 'hero', data }); };
+  const updateAboutData = async (data: AboutData) => { setAboutData(data); await supabase.from('site_config').upsert({ key: 'about', data }); };
+  const updateBgMusic = async (data: BackgroundMusicSettings) => { setBgMusic(data); await supabase.from('site_config').upsert({ key: 'music', data }); };
+  const updateCertifications = async (items: CertificationItem[]) => { setCertifications(items); await supabase.from('site_config').upsert({ key: 'certifications', data: items }); };
+  const updateInterests = async (items: InterestItem[]) => { setInterests(items); await supabase.from('site_config').upsert({ key: 'interests', data: items }); };
+  const updateBentoItems = async (items: BentoGridItem[]) => { setBentoItems(items); for (const item of items) { await supabase.from('bento_items').upsert({ id: item.id, title: item.title, description: item.description, header: item.header, img: item.img, class_name: item.className }); } };
+  const updateActivities = async (items: ActivityItem[]) => { setActivities(items); for (const item of items) { await supabase.from('activities').upsert({ id: item.id, title: item.title, date: item.date, description: item.description, image_url: item.imageUrl }); } };
+  const addGuestbookMessage = async (msg: Omit<GuestbookMessage, 'id'>) => { const { data } = await supabase.from('guestbook').insert(msg).select(); if (data) setGuestbookMessages(prev => [...prev, ...data]); };
+  const deleteGuestbookMessage = async (id: string) => { await supabase.from('guestbook').delete().eq('id', id); setGuestbookMessages(prev => prev.filter(msg => msg.id.toString() !== id.toString())); };
   const login = (password: string) => { if (password === '1234') { setIsAdmin(true); return true; } return false; };
   const logout = () => setIsAdmin(false);
 
   return (
-    <AdminContext.Provider value={{ 
-        sectionTitles, updateSectionTitles,
-        heroData, updateHeroData,
-        aboutData, updateAboutData,
-        bentoItems, updateBentoItems,
-        activities, updateActivities,
-        guestbookMessages, addGuestbookMessage, deleteGuestbookMessage,
-        bgMusic, updateBgMusic,
-        isAdmin, login, logout
-    }}>
+    <AdminContext.Provider value={{ sectionTitles, updateSectionTitles, heroData, updateHeroData, aboutData, updateAboutData, bentoItems, updateBentoItems, activities, updateActivities, guestbookMessages, addGuestbookMessage, deleteGuestbookMessage, bgMusic, updateBgMusic, certifications, updateCertifications, interests, updateInterests, isAdmin, login, logout }}>
       {children}
     </AdminContext.Provider>
   );
