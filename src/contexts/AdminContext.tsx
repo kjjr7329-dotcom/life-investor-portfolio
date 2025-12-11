@@ -1,23 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import type { 
-  HeroData, AboutData, ActivityItem, 
+  SectionTitles, HeroData, AboutData, ActivityItem, 
   BentoGridItem, GuestbookMessage, BackgroundMusicSettings
 } from '../types';
 
-// ★ 섹션 제목 타입 확장 (자격증, 관심사, 포트폴리오 제목 추가)
-interface SectionTitles {
-  navTitle: string;
-  aboutTitle: string;
-  bentoTitle: string;
-  activitiesTitle: string;
-  activitiesSubtitle: string;
-  guestbookTitle: string;
-  certificationsTitle: string; // 추가됨
-  interestsTitle: string;      // 추가됨
-}
-
-// 독립형 인터페이스
 interface CertificationItem { id: string; title: string; description: string; icon: string; color: string; imageUrl?: string; }
 interface InterestItem { id: string; title: string; description: string; category: 'TECH' | 'HOBBY'; icon: string; color: string; imageUrl?: string; }
 
@@ -36,6 +23,7 @@ interface AdminContextType {
   updateHeroData: (data: HeroData) => void;
   updateAboutData: (data: AboutData) => void;
   updateBentoItems: (data: BentoGridItem[]) => void;
+  deleteBentoItem: (id: number) => void; // ★ 삭제 기능 추가
   updateActivities: (data: ActivityItem[]) => void;
   updateBgMusic: (data: BackgroundMusicSettings) => void;
   updateCertifications: (items: CertificationItem[]) => void;
@@ -49,21 +37,27 @@ interface AdminContextType {
   logout: () => void;
 }
 
-// ★ 기본값 설정 (새로운 제목들 추가)
-const defaultSectionTitles: SectionTitles = { 
+const defaultSectionTitles = { 
   navTitle: 'The Life Investor',
   aboutTitle: '나의 이야기',
-  bentoTitle: '나의 작업물',
+  bentoTitle: '나의 여정', // ★ 기본 제목 변경
   activitiesTitle: '최신 근황',
   activitiesSubtitle: '가끔, 소소한 일상을 전합니다.',
   guestbookTitle: '방명록',
-  certificationsTitle: '보유 자격증', // 기본값
-  interestsTitle: '관심사 및 취미'    // 기본값
+  certificationsTitle: '보유 자격증',
+  interestsTitle: '관심사 및 취미'
 };
 
 const defaultHeroData = { mainText: '시간에 투자하고,\n이야기를 만듭니다.', subText: '차트 너머의 세상.\n퇴직 후, 투자의 눈으로 일상을 다시 기록합니다.', bgImage: '' };
 const defaultAboutData = { title: '제이진을 소개합니다', description: '전업 투자자로서 제2의 인생을 항해합니다.', imageUrl: '', skills: ['전업 투자', '유튜브 크리에이터', '콘텐츠 자동화', '동기부여'] };
 const defaultBgMusic = { url: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3', isPlaying: false };
+
+// ★ 기본 아이템을 3개로 제한
+const defaultBentoItems: BentoGridItem[] = [
+  { id: 1, title: '첫 번째 여정', description: '내용을 입력하세요.', header: 'STEP 1', className: 'md:col-span-1' },
+  { id: 2, title: '두 번째 여정', description: '내용을 입력하세요.', header: 'STEP 2', className: 'md:col-span-1' },
+  { id: 3, title: '세 번째 여정', description: '내용을 입력하세요.', header: 'STEP 3', className: 'md:col-span-1' },
+];
 
 const defaultCertifications: CertificationItem[] = [
   { id: '1', title: '공인중개사', description: '부동산 자산 권리 분석 및 투자 중개 실무', icon: 'home', color: 'bg-purple-500/20 text-purple-400' },
@@ -95,10 +89,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
       const { data: configData } = await supabase.from('site_config').select('*');
       if (configData && configData.length > 0) {
         configData.forEach(item => {
-          if (item.key === 'titles') {
-            // 기존 데이터와 합치기 (새로 추가된 키가 없을 경우 대비)
-            setSectionTitles({ ...defaultSectionTitles, ...item.data });
-          }
+          if (item.key === 'titles') setSectionTitles({ ...defaultSectionTitles, ...item.data });
           if (item.key === 'hero') setHeroData(item.data);
           if (item.key === 'about') setAboutData(item.data);
           if (item.key === 'music') setBgMusic(item.data);
@@ -114,8 +105,12 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
         setCertifications(defaultCertifications);
         setInterests(defaultInterests);
       }
+      
       const { data: bento } = await supabase.from('bento_items').select('*').order('created_at', { ascending: true });
-      if (bento) setBentoItems(bento);
+      // 데이터가 없으면 초기값(3개) 보여주기
+      if (bento && bento.length > 0) setBentoItems(bento);
+      else setBentoItems(defaultBentoItems);
+
       const { data: acts } = await supabase.from('activities').select('*').order('sort_order', { ascending: true });
       if (acts) setActivities(acts.map((item: any) => ({ ...item, imageUrl: item.image_url })));
       const { data: msgs } = await supabase.from('guestbook').select('*').order('created_at', { ascending: true });
@@ -131,7 +126,23 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
   const updateBgMusic = async (data: BackgroundMusicSettings) => { setBgMusic(data); await supabase.from('site_config').upsert({ key: 'music', data }); };
   const updateCertifications = async (items: CertificationItem[]) => { setCertifications(items); await supabase.from('site_config').upsert({ key: 'certifications', data: items }); };
   const updateInterests = async (items: InterestItem[]) => { setInterests(items); await supabase.from('site_config').upsert({ key: 'interests', data: items }); };
-  const updateBentoItems = async (items: BentoGridItem[]) => { setBentoItems(items); for (const item of items) { await supabase.from('bento_items').upsert({ id: item.id, title: item.title, description: item.description, header: item.header, img: item.img, class_name: item.className }); } };
+  
+  const updateBentoItems = async (items: BentoGridItem[]) => { 
+    setBentoItems(items); 
+    for (const item of items) { 
+      await supabase.from('bento_items').upsert({ id: item.id, title: item.title, description: item.description, header: item.header, img: item.img, class_name: item.className }); 
+    } 
+  };
+
+  // ★ 진짜 삭제 기능 (DB에서 지움)
+  const deleteBentoItem = async (id: number) => {
+    const { error } = await supabase.from('bento_items').delete().eq('id', id);
+    if (!error) {
+      setBentoItems(prev => prev.filter(item => item.id !== id));
+    } else {
+      alert("삭제 중 오류가 발생했습니다.");
+    }
+  };
   
   const updateActivities = async (items: ActivityItem[]) => { 
     setActivities(items); 
@@ -159,7 +170,8 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
   return (
     <AdminContext.Provider value={{ 
       sectionTitles, updateSectionTitles, heroData, updateHeroData, aboutData, updateAboutData, 
-      bentoItems, updateBentoItems, activities, updateActivities, reorderActivities,
+      bentoItems, updateBentoItems, deleteBentoItem, // ★ 추가
+      activities, updateActivities, reorderActivities,
       guestbookMessages, addGuestbookMessage, deleteGuestbookMessage, 
       bgMusic, updateBgMusic, certifications, updateCertifications, interests, updateInterests, 
       isAdmin, login, logout 
