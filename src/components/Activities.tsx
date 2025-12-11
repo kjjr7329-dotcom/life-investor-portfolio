@@ -1,13 +1,13 @@
-import React, { useRef, useState, MouseEvent } from 'react';
+import React, { useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, ChevronLeft, ChevronRight, Plus, Edit2, Trash2, Save, X, CalendarClock, GripVertical } from 'lucide-react';
 import { useAdmin } from '../contexts/AdminContext';
 import type { ActivityItem } from '../types';
 import ActivityFormModal from './ActivityFormModal';
 
-// ★ [수정됨] 에러 원인 해결! (DragEndEvent를 type으로 분리)
+// 드래그 앤 드롭 라이브러리
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
-import type { DragEndEvent } from '@dnd-kit/core'; // 여기가 핵심입니다.
+import type { DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
@@ -19,26 +19,33 @@ const SortableActivityCard = ({ activity, isAdmin, onEdit, onDelete }: { activit
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
-    zIndex: isDragging ? 999 : 'auto', // 드래그 중인 카드가 맨 위로 오게
+    zIndex: isDragging ? 999 : 'auto',
   };
 
   return (
-    <div ref={setNodeRef} style={style} className="flex-shrink-0 w-[280px] md:w-[350px] relative group touch-none">
-      <div className="bg-zinc-900 rounded-2xl overflow-hidden border border-white/10 hover:border-[#D9F99D]/50 transition-colors h-full flex flex-col">
-        {/* 드래그 손잡이 */}
+    <div 
+      ref={setNodeRef} 
+      style={style} 
+      // ★ 여기가 핵심 수정 포인트! (snap-center 추가, 너비 w-[85vw]로 확대)
+      className="snap-center flex-shrink-0 w-[85vw] md:w-[350px] relative group touch-none"
+    >
+      <div className="bg-zinc-900 rounded-2xl overflow-hidden border border-white/10 hover:border-[#D9F99D]/50 transition-colors h-full flex flex-col shadow-lg">
+        {/* 드래그 손잡이 (관리자용) */}
         {isAdmin && (
           <div {...attributes} {...listeners} className="absolute top-2 left-2 z-20 p-2 bg-black/60 rounded-full cursor-grab active:cursor-grabbing text-white hover:text-[#D9F99D]">
             <GripVertical size={16} />
           </div>
         )}
         
-        <div className="h-40 md:h-48 bg-zinc-800 relative overflow-hidden">
+        <div className="h-56 md:h-48 bg-zinc-800 relative overflow-hidden">
           {activity.imageUrl ? <img src={activity.imageUrl} alt={activity.title} className="w-full h-full object-cover" draggable={false} /> : <div className="w-full h-full flex items-center justify-center text-zinc-600">No Image</div>}
         </div>
-        <div className="p-5 md:p-6 flex-1 flex flex-col">
-          <div className="flex items-center gap-2 text-[#D9F99D] text-xs md:text-sm mb-3"><Calendar size={14} /><span>{activity.date}</span></div>
-          <h3 className="text-lg md:text-xl font-bold text-white mb-2 line-clamp-1">{activity.title}</h3>
-          <p className="text-gray-400 text-xs md:text-sm line-clamp-3 leading-relaxed">{activity.description}</p>
+        <div className="p-6 md:p-6 flex-1 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center gap-2 text-[#D9F99D] text-sm mb-3"><Calendar size={14} /><span>{activity.date}</span></div>
+            <h3 className="text-xl md:text-xl font-bold text-white mb-2 line-clamp-1">{activity.title}</h3>
+            <p className="text-gray-400 text-sm line-clamp-3 leading-relaxed">{activity.description}</p>
+          </div>
         </div>
       </div>
       {isAdmin && (
@@ -83,8 +90,8 @@ const Activities: React.FC = () => {
   const scroll = (direction: 'left' | 'right') => { if (scrollRef.current) scrollRef.current.scrollBy({ left: direction === 'left' ? -340 : 340, behavior: 'smooth' }); };
 
   return (
-    <section className="py-16 md:py-32 px-6 w-full bg-[#1A1A1A] relative" id="activities">
-      <div className="max-w-7xl mx-auto mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+    <section className="py-16 md:py-32 px-0 md:px-6 w-full bg-[#1A1A1A] relative" id="activities">
+      <div className="max-w-7xl mx-auto mb-8 px-6 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div className="flex flex-col gap-2 w-full md:w-auto">
           {isEditingTitle ? (
             <div className="flex flex-col gap-2 bg-zinc-900 p-4 rounded-xl border border-[#D9F99D] w-full md:w-96">
@@ -99,26 +106,30 @@ const Activities: React.FC = () => {
             <div className="group relative">
               <div className="flex items-center gap-3">
                 <CalendarClock className="text-[#D9F99D] hidden md:block" size={36} />
-                <h2 className="text-3xl md:text-5xl font-bold text-white tracking-tight">
+                <h2 className="text-2xl md:text-5xl font-bold text-white tracking-tight">
                   {sectionTitles.activitiesTitle}
                 </h2>
                 {isAdmin && <button onClick={() => setIsEditingTitle(true)} className="text-zinc-500 hover:text-white"><Edit2 size={18} /></button>}
               </div>
-              <p className="text-base md:text-lg text-gray-400 font-serif-KR mt-2 ml-1">{sectionTitles.activitiesSubtitle}</p>
+              <p className="text-sm md:text-lg text-gray-400 font-serif-KR mt-2 ml-1">{sectionTitles.activitiesSubtitle}</p>
             </div>
           )}
         </div>
 
         <div className="flex gap-4 items-center self-end">
           {isAdmin && <button onClick={handleAdd} className="flex items-center gap-2 px-4 py-2 bg-[#D9F99D] text-black rounded-lg hover:bg-[#bef264] font-bold text-sm"><Plus size={18} /> <span className="hidden md:inline">활동 추가</span></button>}
-          <div className="flex gap-2">
+          <div className="hidden md:flex gap-2">
             <button onClick={() => scroll('left')} className="p-3 rounded-full bg-zinc-800 text-white hover:bg-zinc-700"><ChevronLeft size={20} /></button>
             <button onClick={() => scroll('right')} className="p-3 rounded-full bg-zinc-800 text-white hover:bg-zinc-700"><ChevronRight size={20} /></button>
           </div>
         </div>
       </div>
 
-      <div ref={scrollRef} className="flex gap-6 overflow-x-auto pb-8 scrollbar-hide px-2">
+      {/* ★ 스크롤 컨테이너 수정: snap-x snap-mandatory 추가 */}
+      <div 
+        ref={scrollRef} 
+        className="flex gap-4 md:gap-6 overflow-x-auto pb-12 scrollbar-hide px-6 snap-x snap-mandatory"
+      >
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={activities.map(a => a.id)} strategy={horizontalListSortingStrategy}>
             {activities.map((activity) => (
