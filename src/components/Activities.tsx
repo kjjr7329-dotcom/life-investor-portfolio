@@ -1,12 +1,58 @@
 import React, { useRef, useState, MouseEvent } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, ChevronLeft, ChevronRight, Plus, Edit2, Trash2, Save, X, CalendarClock } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Plus, Edit2, Trash2, Save, X, CalendarClock, GripVertical } from 'lucide-react';
 import { useAdmin } from '../contexts/AdminContext';
 import type { ActivityItem } from '../types';
 import ActivityFormModal from './ActivityFormModal';
 
+// ★ [수정됨] 에러 원인 해결! (DragEndEvent를 type으로 분리)
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import type { DragEndEvent } from '@dnd-kit/core'; // 여기가 핵심입니다.
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+// 드래그 가능한 카드 컴포넌트
+const SortableActivityCard = ({ activity, isAdmin, onEdit, onDelete }: { activity: ActivityItem; isAdmin: boolean; onEdit: (item: ActivityItem) => void; onDelete: (id: string) => void }) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: activity.id });
+  
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 999 : 'auto', // 드래그 중인 카드가 맨 위로 오게
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex-shrink-0 w-[280px] md:w-[350px] relative group touch-none">
+      <div className="bg-zinc-900 rounded-2xl overflow-hidden border border-white/10 hover:border-[#D9F99D]/50 transition-colors h-full flex flex-col">
+        {/* 드래그 손잡이 */}
+        {isAdmin && (
+          <div {...attributes} {...listeners} className="absolute top-2 left-2 z-20 p-2 bg-black/60 rounded-full cursor-grab active:cursor-grabbing text-white hover:text-[#D9F99D]">
+            <GripVertical size={16} />
+          </div>
+        )}
+        
+        <div className="h-40 md:h-48 bg-zinc-800 relative overflow-hidden">
+          {activity.imageUrl ? <img src={activity.imageUrl} alt={activity.title} className="w-full h-full object-cover" draggable={false} /> : <div className="w-full h-full flex items-center justify-center text-zinc-600">No Image</div>}
+        </div>
+        <div className="p-5 md:p-6 flex-1 flex flex-col">
+          <div className="flex items-center gap-2 text-[#D9F99D] text-xs md:text-sm mb-3"><Calendar size={14} /><span>{activity.date}</span></div>
+          <h3 className="text-lg md:text-xl font-bold text-white mb-2 line-clamp-1">{activity.title}</h3>
+          <p className="text-gray-400 text-xs md:text-sm line-clamp-3 leading-relaxed">{activity.description}</p>
+        </div>
+      </div>
+      {isAdmin && (
+        <div className="absolute top-3 right-3 flex gap-2 z-20">
+          <button onClick={() => onEdit(activity)} className="p-2 bg-black/60 text-white rounded-full hover:bg-[#D9F99D] hover:text-black"><Edit2 size={14} /></button>
+          <button onClick={() => onDelete(activity.id)} className="p-2 bg-black/60 text-white rounded-full hover:bg-red-500"><Trash2 size={14} /></button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const Activities: React.FC = () => {
-  const { activities, updateActivities, sectionTitles, updateSectionTitles, isAdmin } = useAdmin();
+  const { activities, updateActivities, reorderActivities, sectionTitles, updateSectionTitles, isAdmin } = useAdmin();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ActivityItem | null>(null);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -14,19 +60,27 @@ const Activities: React.FC = () => {
   const [tempSubtitle, setTempSubtitle] = useState(sectionTitles.activitiesSubtitle);
   
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [startX, setStartX] = useState(0);
-  const [scrollLeft, setScrollLeft] = useState(0);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (active.id !== over?.id) {
+      const oldIndex = activities.findIndex((item) => item.id === active.id);
+      const newIndex = activities.findIndex((item) => item.id === over?.id);
+      const newOrder = arrayMove(activities, oldIndex, newIndex);
+      reorderActivities(newOrder);
+    }
+  };
 
   const handleTitleSave = () => { updateSectionTitles({ ...sectionTitles, activitiesTitle: tempTitle, activitiesSubtitle: tempSubtitle }); setIsEditingTitle(false); };
   const handleDelete = (id: string) => { if (window.confirm('정말 삭제하시겠습니까?')) updateActivities(activities.filter(a => a.id !== id)); };
   const handleEdit = (item: ActivityItem) => { setEditingItem(item); setIsFormOpen(true); };
   const handleAdd = () => { setEditingItem(null); setIsFormOpen(true); };
   const scroll = (direction: 'left' | 'right') => { if (scrollRef.current) scrollRef.current.scrollBy({ left: direction === 'left' ? -340 : 340, behavior: 'smooth' }); };
-  const handleMouseDown = (e: MouseEvent) => { if (scrollRef.current) { setIsDragging(true); setStartX(e.pageX - scrollRef.current.offsetLeft); setScrollLeft(scrollRef.current.scrollLeft); }};
-  const handleMouseLeave = () => setIsDragging(false);
-  const handleMouseUp = () => setIsDragging(false);
-  const handleMouseMove = (e: MouseEvent) => { if (!isDragging || !scrollRef.current) return; e.preventDefault(); const x = e.pageX - scrollRef.current.offsetLeft; const walk = (x - startX) * 2; scrollRef.current.scrollLeft = scrollLeft - walk; };
 
   return (
     <section className="py-16 md:py-32 px-6 w-full bg-[#1A1A1A] relative" id="activities">
@@ -44,7 +98,6 @@ const Activities: React.FC = () => {
           ) : (
             <div className="group relative">
               <div className="flex items-center gap-3">
-                {/* ★ 디자인 통일 */}
                 <CalendarClock className="text-[#D9F99D] hidden md:block" size={36} />
                 <h2 className="text-3xl md:text-5xl font-bold text-white tracking-tight">
                   {sectionTitles.activitiesTitle}
@@ -65,25 +118,20 @@ const Activities: React.FC = () => {
         </div>
       </div>
 
-      <div ref={scrollRef} className="flex gap-6 overflow-x-auto pb-8 scrollbar-hide cursor-grab active:cursor-grabbing px-2" onMouseDown={handleMouseDown} onMouseLeave={handleMouseLeave} onMouseUp={handleMouseUp} onMouseMove={handleMouseMove}>
-        {activities.map((activity, index) => (
-          <motion.div key={activity.id} className="flex-shrink-0 w-[280px] md:w-[350px] bg-zinc-900 rounded-2xl overflow-hidden border border-white/10 group relative hover:border-[#D9F99D]/50 transition-colors">
-            <div className="h-40 md:h-48 bg-zinc-800 relative overflow-hidden">
-              {activity.imageUrl ? <img src={activity.imageUrl} alt={activity.title} className="w-full h-full object-cover" draggable={false} /> : <div className="w-full h-full flex items-center justify-center text-zinc-600">No Image</div>}
-            </div>
-            <div className="p-5 md:p-6">
-              <div className="flex items-center gap-2 text-[#D9F99D] text-xs md:text-sm mb-3"><Calendar size={14} /><span>{activity.date}</span></div>
-              <h3 className="text-lg md:text-xl font-bold text-white mb-2 line-clamp-1">{activity.title}</h3>
-              <p className="text-gray-400 text-xs md:text-sm line-clamp-3 leading-relaxed">{activity.description}</p>
-            </div>
-            {isAdmin && (
-              <div className="absolute top-3 right-3 flex gap-2">
-                <button onClick={() => handleEdit(activity)} className="p-2 bg-black/60 text-white rounded-full hover:bg-[#D9F99D] hover:text-black"><Edit2 size={14} /></button>
-                <button onClick={() => handleDelete(activity.id)} className="p-2 bg-black/60 text-white rounded-full hover:bg-red-500"><Trash2 size={14} /></button>
-              </div>
-            )}
-          </motion.div>
-        ))}
+      <div ref={scrollRef} className="flex gap-6 overflow-x-auto pb-8 scrollbar-hide px-2">
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={activities.map(a => a.id)} strategy={horizontalListSortingStrategy}>
+            {activities.map((activity) => (
+              <SortableActivityCard 
+                key={activity.id} 
+                activity={activity} 
+                isAdmin={isAdmin} 
+                onEdit={handleEdit} 
+                onDelete={handleDelete} 
+              />
+            ))}
+          </SortableContext>
+        </DndContext>
       </div>
       <ActivityFormModal isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} editItem={editingItem} />
     </section>

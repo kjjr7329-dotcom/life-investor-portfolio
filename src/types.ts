@@ -30,11 +30,19 @@ export interface BentoGridItem {
 }
 
 export interface ActivityItem {
+  // ... 다른 타입들은 그대로 두시고 ...
+
+// ★ ActivityItem에 sort_order 추가
+export interface ActivityItem {
   id: string;
   title: string;
   date: string;
   description: string;
   imageUrl?: string;
+  sort_order?: number; // 이 줄이 추가되었습니다!
+}
+
+// ... 아래 다른 타입들도 그대로 ...
 }
 
 export interface GuestbookMessage {
