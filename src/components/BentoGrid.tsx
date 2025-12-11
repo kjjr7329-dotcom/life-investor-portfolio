@@ -28,7 +28,6 @@ const BentoGrid: React.FC = () => {
             </div>
           ) : (
             <div className="flex items-center gap-3 group">
-              {/* ★ 디자인 통일: 아이콘 + 제목 */}
               <FolderOpen className="text-[#D9F99D] hidden md:block" size={36} />
               <h2 className="text-3xl md:text-5xl font-bold text-white tracking-tight">
                 {sectionTitles.bentoTitle}
@@ -40,18 +39,27 @@ const BentoGrid: React.FC = () => {
         {isAdmin && <button onClick={handleAddClick} className="flex items-center gap-2 px-4 py-2 bg-zinc-800 text-[#D9F99D] rounded-full hover:bg-zinc-700 text-sm font-bold"><Plus size={18} /> 추가</button>}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 auto-rows-[20rem]">
+      {/* Grid 설정: md:grid-cols-3 (PC에서 3칸) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {bentoItems.map((item, i) => (
           <motion.div
             key={item.id || i}
             onClick={() => handleEditClick(item)}
-            className={`row-span-1 rounded-2xl group/bento hover:shadow-2xl transition duration-300 shadow-input dark:shadow-none p-5 bg-zinc-900/50 border border-white/5 justify-between flex flex-col space-y-4 cursor-pointer relative overflow-hidden ${item.className || ''} ${isAdmin ? 'hover:border-[#D9F99D]' : ''}`}
+            // 높이를 고정하지 않고 내용에 따라 늘어나되 최소 높이 지정 (min-h-[24rem])
+            className={`rounded-2xl group/bento hover:shadow-2xl transition duration-300 shadow-input dark:shadow-none p-5 bg-zinc-900/50 border border-white/5 flex flex-col space-y-4 cursor-pointer relative overflow-hidden min-h-[24rem] ${item.className || ''} ${isAdmin ? 'hover:border-[#D9F99D]' : ''}`}
           >
-            {item.img && <div className="flex-1 w-full h-full min-h-[6rem] rounded-xl overflow-hidden relative"><img src={item.img} alt={item.title} className="object-cover w-full h-full absolute inset-0 opacity-60 group-hover/bento:opacity-100 transition-opacity duration-500" /></div>}
-            <div className="group-hover/bento:translate-x-2 transition duration-200 relative z-10">
+            {item.img && (
+              <div className="flex-1 w-full h-48 rounded-xl overflow-hidden relative">
+                <img src={item.img} alt={item.title} className="object-cover w-full h-full absolute inset-0 opacity-80 group-hover/bento:opacity-100 transition-opacity duration-500" />
+              </div>
+            )}
+            <div className="group-hover/bento:translate-x-2 transition duration-200 relative z-10 flex-shrink-0">
               {item.header && <div className="text-[#D9F99D] text-xs font-bold mb-2 uppercase tracking-wider">{item.header}</div>}
               <div className="font-sans font-bold text-white text-xl mb-2">{item.title}</div>
-              <div className="font-sans font-normal text-sm text-gray-400 line-clamp-2">{item.description}</div>
+              {/* ★ 설명글: 3줄까지 허용 (line-clamp-3) + 줄바꿈 허용 (whitespace-pre-wrap) */}
+              <div className="font-sans font-normal text-sm text-gray-400 line-clamp-3 whitespace-pre-wrap leading-relaxed">
+                {item.description}
+              </div>
             </div>
           </motion.div>
         ))}
