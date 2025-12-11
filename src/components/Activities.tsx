@@ -5,13 +5,11 @@ import { useAdmin } from '../contexts/AdminContext';
 import type { ActivityItem } from '../types';
 import ActivityFormModal from './ActivityFormModal';
 
-// 드래그 앤 드롭 라이브러리
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-// 드래그 가능한 카드 컴포넌트
 const SortableActivityCard = ({ activity, isAdmin, onEdit, onDelete }: { activity: ActivityItem; isAdmin: boolean; onEdit: (item: ActivityItem) => void; onDelete: (id: string) => void }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: activity.id });
   
@@ -26,18 +24,27 @@ const SortableActivityCard = ({ activity, isAdmin, onEdit, onDelete }: { activit
     <div 
       ref={setNodeRef} 
       style={style} 
-      // ★ 여기가 핵심 수정 포인트! (snap-center 추가, 너비 w-[85vw]로 확대)
-      className="snap-center flex-shrink-0 w-[85vw] md:w-[350px] relative group touch-none"
+      // ★ 중요: 여기서 'touch-none'을 제거했습니다! (이제 스크롤 잘 됨)
+      className="snap-center flex-shrink-0 w-[85vw] md:w-[350px] relative group"
     >
-      <div className="bg-zinc-900 rounded-2xl overflow-hidden border border-white/10 hover:border-[#D9F99D]/50 transition-colors h-full flex flex-col shadow-lg">
-        {/* 드래그 손잡이 (관리자용) */}
+      <div className="bg-zinc-900 rounded-2xl overflow-hidden border border-white/10 hover:border-[#D9F99D]/50 transition-colors h-full flex flex-col shadow-lg relative">
+        
+        {/* ★ 드래그 손잡이: 여기만 'touch-none' 적용 (이걸 잡아야만 드래그 됨) */}
         {isAdmin && (
-          <div {...attributes} {...listeners} className="absolute top-2 left-2 z-20 p-2 bg-black/60 rounded-full cursor-grab active:cursor-grabbing text-white hover:text-[#D9F99D]">
-            <GripVertical size={16} />
+          <div {...attributes} {...listeners} className="absolute top-3 left-3 z-30 p-2 bg-black/70 rounded-full cursor-grab active:cursor-grabbing text-white hover:text-[#D9F99D] touch-none shadow-md border border-white/10">
+            <GripVertical size={18} />
+          </div>
+        )}
+
+        {/* ★ 수정/삭제 버튼: z-index를 30으로 높여서 무조건 보이게 함 */}
+        {isAdmin && (
+          <div className="absolute top-3 right-3 flex gap-2 z-30">
+            <button onClick={(e) => { e.stopPropagation(); onEdit(activity); }} className="p-2 bg-black/70 text-white rounded-full hover:bg-[#D9F99D] hover:text-black shadow-md border border-white/10"><Edit2 size={16} /></button>
+            <button onClick={(e) => { e.stopPropagation(); onDelete(activity.id); }} className="p-2 bg-black/70 text-white rounded-full hover:bg-red-500 shadow-md border border-white/10"><Trash2 size={16} /></button>
           </div>
         )}
         
-        <div className="h-56 md:h-48 bg-zinc-800 relative overflow-hidden">
+        <div className="h-64 md:h-48 bg-zinc-800 relative overflow-hidden">
           {activity.imageUrl ? <img src={activity.imageUrl} alt={activity.title} className="w-full h-full object-cover" draggable={false} /> : <div className="w-full h-full flex items-center justify-center text-zinc-600">No Image</div>}
         </div>
         <div className="p-6 md:p-6 flex-1 flex flex-col justify-between">
@@ -48,12 +55,6 @@ const SortableActivityCard = ({ activity, isAdmin, onEdit, onDelete }: { activit
           </div>
         </div>
       </div>
-      {isAdmin && (
-        <div className="absolute top-3 right-3 flex gap-2 z-20">
-          <button onClick={() => onEdit(activity)} className="p-2 bg-black/60 text-white rounded-full hover:bg-[#D9F99D] hover:text-black"><Edit2 size={14} /></button>
-          <button onClick={() => onDelete(activity.id)} className="p-2 bg-black/60 text-white rounded-full hover:bg-red-500"><Trash2 size={14} /></button>
-        </div>
-      )}
     </div>
   );
 };
@@ -116,7 +117,7 @@ const Activities: React.FC = () => {
           )}
         </div>
 
-        <div className="flex gap-4 items-center self-end">
+        <div className="flex gap-4 items-center self-end px-6 md:px-0">
           {isAdmin && <button onClick={handleAdd} className="flex items-center gap-2 px-4 py-2 bg-[#D9F99D] text-black rounded-lg hover:bg-[#bef264] font-bold text-sm"><Plus size={18} /> <span className="hidden md:inline">활동 추가</span></button>}
           <div className="hidden md:flex gap-2">
             <button onClick={() => scroll('left')} className="p-3 rounded-full bg-zinc-800 text-white hover:bg-zinc-700"><ChevronLeft size={20} /></button>
@@ -125,7 +126,6 @@ const Activities: React.FC = () => {
         </div>
       </div>
 
-      {/* ★ 스크롤 컨테이너 수정: snap-x snap-mandatory 추가 */}
       <div 
         ref={scrollRef} 
         className="flex gap-4 md:gap-6 overflow-x-auto pb-12 scrollbar-hide px-6 snap-x snap-mandatory"
