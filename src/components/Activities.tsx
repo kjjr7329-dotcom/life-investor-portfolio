@@ -1,17 +1,16 @@
 import React, { useRef, useState } from 'react';
-import { motion } from 'framer-motion';
 import { Calendar, ChevronLeft, ChevronRight, Plus, Edit2, Trash2, Save, X, CalendarClock, GripVertical } from 'lucide-react';
 import { useAdmin } from '../contexts/AdminContext';
 import type { ActivityItem } from '../types';
 import ActivityFormModal from './ActivityFormModal';
-import { supabase } from '../lib/supabaseClient'; // ✅ Supabase 추가됨
+import { supabase } from '../lib/supabaseClient'; // ✅ Supabase 연결
 
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-// --- 드래그 앤 드롭 카드 컴포넌트 ---
+// --- 드래그 카드 컴포넌트 ---
 const SortableActivityCard = ({ activity, isAdmin, onEdit, onDelete }: { activity: ActivityItem; isAdmin: boolean; onEdit: (item: ActivityItem) => void; onDelete: (id: string) => void }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: activity.id });
 
@@ -23,14 +22,10 @@ const SortableActivityCard = ({ activity, isAdmin, onEdit, onDelete }: { activit
   };
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className="snap-center flex-shrink-0 w-[85vw] md:w-[350px] relative group"
-    >
+    <div ref={setNodeRef} style={style} className="snap-center flex-shrink-0 w-[85vw] md:w-[350px] relative group">
       <div className="bg-zinc-900 rounded-2xl overflow-hidden border border-white/10 hover:border-[#D9F99D]/50 transition-colors h-full flex flex-col shadow-lg relative">
         
-        {/* 드래그 손잡이 */}
+        {/* 드래그 손잡이 (관리자용) */}
         {isAdmin && (
           <div {...attributes} {...listeners} className="absolute top-3 left-3 z-30 p-2 bg-black/70 rounded-full cursor-grab active:cursor-grabbing text-white hover:text-[#D9F99D] touch-none shadow-md border border-white/10">
             <GripVertical size={18} />
@@ -65,7 +60,7 @@ const SortableActivityCard = ({ activity, isAdmin, onEdit, onDelete }: { activit
   );
 };
 
-// --- 메인 Activities 컴포넌트 ---
+// --- 메인 화면 컴포넌트 ---
 const Activities: React.FC = () => {
   const { activities, updateActivities, reorderActivities, sectionTitles, updateSectionTitles, isAdmin } = useAdmin();
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -81,20 +76,23 @@ const Activities: React.FC = () => {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  // ✅ [핵심 기능] 순서 저장 함수
+  // ✅ [핵심] 순서를 DB에 저장하는 함수
   const saveOrderToSupabase = async (newItems: ActivityItem[]) => {
     try {
+      // 1. 하나씩 순서 번호를 업데이트합니다.
       const updates = newItems.map((item, index) => 
         supabase.from('activities').update({ sort_order: index }).eq('id', item.id)
       );
       await Promise.all(updates);
-      console.log('✅ 순서 저장 완료!');
-    } catch (error) {
-      console.error('❌ 순서 저장 실패:', error);
+      // 성공하면 아무 일도 안 일어남 (조용히 성공)
+      console.log('순서 저장 성공');
+    } catch (error: any) {
+      // 실패하면 에러 메시지를 띄웁니다!
+      alert('순서 저장 실패! (보안 설정을 확인하세요): ' + error.message);
     }
   };
 
-  // ✅ [핵심 기능] 드래그 끝났을 때 처리
+  // ✅ 드래그가 끝났을 때 실행
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (active.id !== over?.id) {
@@ -108,6 +106,7 @@ const Activities: React.FC = () => {
     }
   };
 
+  // 기타 버튼 기능들
   const handleTitleSave = () => { updateSectionTitles({ ...sectionTitles, activitiesTitle: tempTitle, activitiesSubtitle: tempSubtitle }); setIsEditingTitle(false); };
   const handleDelete = (id: string) => { if (window.confirm('정말 삭제하시겠습니까?')) updateActivities(activities.filter(a => a.id !== id)); };
   const handleEdit = (item: ActivityItem) => { setEditingItem(item); setIsFormOpen(true); };
