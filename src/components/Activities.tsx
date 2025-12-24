@@ -4,15 +4,17 @@ import { Calendar, ChevronLeft, ChevronRight, Plus, Edit2, Trash2, Save, X, Cale
 import { useAdmin } from '../contexts/AdminContext';
 import type { ActivityItem } from '../types';
 import ActivityFormModal from './ActivityFormModal';
+import { supabase } from '../lib/supabaseClient'; // ✅ Supabase 추가됨
 
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
+// --- 드래그 앤 드롭 카드 컴포넌트 ---
 const SortableActivityCard = ({ activity, isAdmin, onEdit, onDelete }: { activity: ActivityItem; isAdmin: boolean; onEdit: (item: ActivityItem) => void; onDelete: (id: string) => void }) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: activity.id });
-  
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -21,32 +23,36 @@ const SortableActivityCard = ({ activity, isAdmin, onEdit, onDelete }: { activit
   };
 
   return (
-    <div 
-      ref={setNodeRef} 
-      style={style} 
-      // ★ 중요: 여기서 'touch-none'을 제거했습니다! (이제 스크롤 잘 됨)
+    <div
+      ref={setNodeRef}
+      style={style}
       className="snap-center flex-shrink-0 w-[85vw] md:w-[350px] relative group"
     >
       <div className="bg-zinc-900 rounded-2xl overflow-hidden border border-white/10 hover:border-[#D9F99D]/50 transition-colors h-full flex flex-col shadow-lg relative">
         
-        {/* ★ 드래그 손잡이: 여기만 'touch-none' 적용 (이걸 잡아야만 드래그 됨) */}
+        {/* 드래그 손잡이 */}
         {isAdmin && (
           <div {...attributes} {...listeners} className="absolute top-3 left-3 z-30 p-2 bg-black/70 rounded-full cursor-grab active:cursor-grabbing text-white hover:text-[#D9F99D] touch-none shadow-md border border-white/10">
             <GripVertical size={18} />
           </div>
         )}
 
-        {/* ★ 수정/삭제 버튼: z-index를 30으로 높여서 무조건 보이게 함 */}
+        {/* 수정/삭제 버튼 */}
         {isAdmin && (
           <div className="absolute top-3 right-3 flex gap-2 z-30">
             <button onClick={(e) => { e.stopPropagation(); onEdit(activity); }} className="p-2 bg-black/70 text-white rounded-full hover:bg-[#D9F99D] hover:text-black shadow-md border border-white/10"><Edit2 size={16} /></button>
             <button onClick={(e) => { e.stopPropagation(); onDelete(activity.id); }} className="p-2 bg-black/70 text-white rounded-full hover:bg-red-500 shadow-md border border-white/10"><Trash2 size={16} /></button>
           </div>
         )}
-        
+
         <div className="h-64 md:h-48 bg-zinc-800 relative overflow-hidden">
-          {activity.imageUrl ? <img src={activity.imageUrl} alt={activity.title} className="w-full h-full object-cover" draggable={false} /> : <div className="w-full h-full flex items-center justify-center text-zinc-600">No Image</div>}
+          {activity.imageUrl ? (
+            <img src={activity.imageUrl} alt={activity.title} className="w-full h-full object-cover" draggable={false} />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-zinc-600">No Image</div>
+          )}
         </div>
+
         <div className="p-6 md:p-6 flex-1 flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-2 text-[#D9F99D] text-sm mb-3"><Calendar size={14} /><span>{activity.date}</span></div>
@@ -59,6 +65,7 @@ const SortableActivityCard = ({ activity, isAdmin, onEdit, onDelete }: { activit
   );
 };
 
+// --- 메인 Activities 컴포넌트 ---
 const Activities: React.FC = () => {
   const { activities, updateActivities, reorderActivities, sectionTitles, updateSectionTitles, isAdmin } = useAdmin();
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -66,7 +73,7 @@ const Activities: React.FC = () => {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [tempTitle, setTempTitle] = useState(sectionTitles.activitiesTitle);
   const [tempSubtitle, setTempSubtitle] = useState(sectionTitles.activitiesSubtitle);
-  
+
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const sensors = useSensors(
@@ -74,13 +81,30 @@ const Activities: React.FC = () => {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
+  // ✅ [핵심 기능] 순서 저장 함수
+  const saveOrderToSupabase = async (newItems: ActivityItem[]) => {
+    try {
+      const updates = newItems.map((item, index) => 
+        supabase.from('activities').update({ sort_order: index }).eq('id', item.id)
+      );
+      await Promise.all(updates);
+      console.log('✅ 순서 저장 완료!');
+    } catch (error) {
+      console.error('❌ 순서 저장 실패:', error);
+    }
+  };
+
+  // ✅ [핵심 기능] 드래그 끝났을 때 처리
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (active.id !== over?.id) {
       const oldIndex = activities.findIndex((item) => item.id === active.id);
       const newIndex = activities.findIndex((item) => item.id === over?.id);
+      
       const newOrder = arrayMove(activities, oldIndex, newIndex);
-      reorderActivities(newOrder);
+      
+      reorderActivities(newOrder); // 1. 화면 먼저 바꾸고
+      saveOrderToSupabase(newOrder); // 2. DB에 저장!
     }
   };
 
@@ -107,9 +131,7 @@ const Activities: React.FC = () => {
             <div className="group relative">
               <div className="flex items-center gap-3">
                 <CalendarClock className="text-[#D9F99D] hidden md:block" size={36} />
-                <h2 className="text-2xl md:text-5xl font-bold text-white tracking-tight">
-                  {sectionTitles.activitiesTitle}
-                </h2>
+                <h2 className="text-2xl md:text-5xl font-bold text-white tracking-tight">{sectionTitles.activitiesTitle}</h2>
                 {isAdmin && <button onClick={() => setIsEditingTitle(true)} className="text-zinc-500 hover:text-white"><Edit2 size={18} /></button>}
               </div>
               <p className="text-sm md:text-lg text-gray-400 font-serif-KR mt-2 ml-1">{sectionTitles.activitiesSubtitle}</p>
@@ -118,7 +140,7 @@ const Activities: React.FC = () => {
         </div>
 
         <div className="flex gap-4 items-center self-end px-6 md:px-0">
-          {isAdmin && <button onClick={handleAdd} className="flex items-center gap-2 px-4 py-2 bg-[#D9F99D] text-black rounded-lg hover:bg-[#bef264] font-bold text-sm"><Plus size={18} /> <span className="hidden md:inline">활동 추가</span></button>}
+          {isAdmin && <button onClick={handleAdd} className="flex items-center gap-2 px-4 py-2 bg-[#D9F99D] text-black rounded-lg hover:bg-[#bef264] font-bold text-sm"><Plus size={18} /><span className="hidden md:inline">활동 추가</span></button>}
           <div className="hidden md:flex gap-2">
             <button onClick={() => scroll('left')} className="p-3 rounded-full bg-zinc-800 text-white hover:bg-zinc-700"><ChevronLeft size={20} /></button>
             <button onClick={() => scroll('right')} className="p-3 rounded-full bg-zinc-800 text-white hover:bg-zinc-700"><ChevronRight size={20} /></button>
@@ -126,20 +148,11 @@ const Activities: React.FC = () => {
         </div>
       </div>
 
-      <div 
-        ref={scrollRef} 
-        className="flex gap-4 md:gap-6 overflow-x-auto pb-12 scrollbar-hide px-6 snap-x snap-mandatory"
-      >
+      <div ref={scrollRef} className="flex gap-4 md:gap-6 overflow-x-auto pb-12 scrollbar-hide px-6 snap-x snap-mandatory">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={activities.map(a => a.id)} strategy={horizontalListSortingStrategy}>
             {activities.map((activity) => (
-              <SortableActivityCard 
-                key={activity.id} 
-                activity={activity} 
-                isAdmin={isAdmin} 
-                onEdit={handleEdit} 
-                onDelete={handleDelete} 
-              />
+              <SortableActivityCard key={activity.id} activity={activity} isAdmin={isAdmin} onEdit={handleEdit} onDelete={handleDelete} />
             ))}
           </SortableContext>
         </DndContext>
