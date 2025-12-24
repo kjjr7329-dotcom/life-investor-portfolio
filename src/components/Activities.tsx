@@ -1,9 +1,10 @@
+import { supabase } from '../lib/supabaseClient'; // ✅ 여기 딱 한 번만 있어야 합니다!
 import React, { useRef, useState } from 'react';
+import { motion } from 'framer-motion';
 import { Calendar, ChevronLeft, ChevronRight, Plus, Edit2, Trash2, Save, X, CalendarClock, GripVertical } from 'lucide-react';
 import { useAdmin } from '../contexts/AdminContext';
 import type { ActivityItem } from '../types';
 import ActivityFormModal from './ActivityFormModal';
-import { supabase } from '../lib/supabaseClient'; // ✅ Supabase 연결
 
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
@@ -79,16 +80,13 @@ const Activities: React.FC = () => {
   // ✅ [핵심] 순서를 DB에 저장하는 함수
   const saveOrderToSupabase = async (newItems: ActivityItem[]) => {
     try {
-      // 1. 하나씩 순서 번호를 업데이트합니다.
       const updates = newItems.map((item, index) => 
         supabase.from('activities').update({ sort_order: index }).eq('id', item.id)
       );
       await Promise.all(updates);
-      // 성공하면 아무 일도 안 일어남 (조용히 성공)
       console.log('순서 저장 성공');
     } catch (error: any) {
-      // 실패하면 에러 메시지를 띄웁니다!
-      alert('순서 저장 실패! (보안 설정을 확인하세요): ' + error.message);
+      alert('순서 저장 실패: ' + error.message);
     }
   };
 
